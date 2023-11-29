@@ -1,0 +1,39 @@
+# 加载rstan库
+library(rstan)
+
+# 循环500次，即蒙特卡洛模拟
+for (i in 1:1:500){
+  # 设置t值的序列
+  t <- seq(from=0.01, by=0.01, length=1)
+  
+  # 创建一个100行50列的矩阵X
+  X <- matrix(nrow=100, ncol=50)
+  
+  # 将b的值设为3，非线性参数
+  b <- 3
+  
+  # 循环50次，样本数量为50
+  for (k in 1:1:50){
+    # 生成lam和v的伽玛分布随机变量
+    lam <- rgamma(1, 5, 1/2)
+    v <- rgamma(1, 1, 1/0.2)
+    
+    # 计算Mu为t的b次方的差
+    Mu <- diff(t^b, lag=1)
+    
+    # 循环100次，即时间长度
+    for(m in 1:1:100){
+      # 根据前一个X的值、lam、Mu和v生成X的随机值
+      if (m==1)
+        X[m,k] <- rnorm(n=1, mean=lam[1]*(t[1]^b[1]), sd=v[1]*sqrt(t[1]))
+      else
+        X[m,k] <- rnorm(n=1, mean=X[m-1,k]+lam[1]*Mu[m-1], sd=v[1]*sqrt(t[1]))
+    }
+  }
+  
+  # 创建包含N、T、X和t的列表M0
+  M0 <- list(N=50, T=100, X=X, t=t)
+  
+  # 使用stan函数拟合模型并将结果保存到csv文件中
+  fit <- stan(file = 'test.stan', data = M0, iter=10000, chain=1)
+  write.csv(fit@sim[["samples"]][[1]], paste(i, ".csv"))
