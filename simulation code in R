@@ -37,3 +37,64 @@ for (i in 1:1:500){
   # 使用stan函数拟合模型并将结果保存到csv文件中
   fit <- stan(file = 'test.stan', data = M0, iter=10000, chain=1)
   write.csv(fit@sim[["samples"]][[1]], paste(i, ".csv"))
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# test.stan代码
+ # 数据块，定义输入数据结构
+data {
+  // N表示观测值的数量
+  int<lower=0> N;
+  // T表示时间点的数量
+  int<lower=0> T;
+  // t表示时间点的数组
+  real t[T];
+  // X表示观测值的矩阵
+  real X[T,N];
+}
+
+# 参数块，定义模型参数
+parameters {
+  // lam表示每个观测值的lambda参数
+  real<lower=0> lam[N];
+  // eta表示每个观测值的eta参数
+  real<lower=0> eta[N];
+  // seta表示时间的影响
+  real<lower=0> seta;
+  // a1、b1、a2、b2是gamma分布的形状和比例参数
+  real<lower=0> a1;
+  real<lower=0> b1;
+  real<lower=0> a2;
+  real<lower=0> b2;
+}
+
+# 模型块，定义模型
+model {
+  // a1、b1、a2、b2的先验分布为Cauchy分布
+  a1 ~ cauchy(0, 30);
+  b1 ~ cauchy(0, 30);
+  a2 ~ cauchy(0, 30);
+  b2 ~ cauchy(0, 30);
+  
+  // lam和eta的先验分布为gamma分布
+  for (i in 1:N) {
+    lam[i] ~ gamma(a1, b1);
+    eta[i] ~ gamma(a2, b2);
+  }
+  
+  // seta的先验分布为标准正态分布
+  seta ~ normal(0, 1);
+  
+  // 循环计算每个观测值的概率分布
+  for (j in 1:T) {
+    for (i in 1:N) {
+      if (j == 1) {
+        // 第一个时间点的观测值的概率分布
+        X[j, i] ~ normal(lam[i]*(t[j]^seta), eta[i]*sqrt(t[j]));
+      } else {
+        // 非第一个时间点的观测值的概率分布
+        X[j, i] ~ normal(X[j-1, i]+lam[i]*(t[j]^seta)-lam[i]*(t[j-1]^seta), eta[i]*sqrt((t[j]-t[j-1])));
+      }
+    }
+  }
+}
